@@ -1,0 +1,21 @@
+proxies:
+  - name: "mc-ipv6-direct"
+    listen_net: "tcp6"
+    listen_addr: "[::]:25565"
+    backend_addr: "127.0.0.1:25566"
+    rule: "proxy_protocol"
+    proxy_version: 2
+    connect_timeout: "3s"
+
+  - name: "mc-ipv4-frp"
+    listen_net: "tcp4"
+    listen_addr: "0.0.0.0:25565"
+    backend_addr: "127.0.0.1:25566"
+    rule: "passthrough"
+
+  - name: "bedrock-udp"
+    listen_net: "udp4"
+    listen_addr: "0.0.0.0:19132"
+    backend_addr: "127.0.0.1:19133"
+    rule: "passthrough"
+    udp_session_timeout: "2m"
