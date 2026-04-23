@@ -22,6 +22,30 @@ docker compose up --build -d
 docker-compose up --build -d
 ```
 
+## 构建超时排查
+
+如果构建阶段卡在 `go mod download` 并出现 i/o timeout，可指定 Go 模块代理后重试：
+
+```bash
+GOPROXY=https://goproxy.cn,direct docker compose up --build -d
+```
+
+如果你的网络无法访问 sum.golang.org，也可以临时关闭校验数据库：
+
+```bash
+GOPROXY=https://goproxy.cn,direct GOSUMDB=off docker compose up --build -d
+```
+
+你也可以在仓库根目录创建 `.env`，Compose 会自动读取：
+
+```env
+GOPROXY=https://goproxy.cn,direct
+# 可选：网络受限时再启用
+# GOSUMDB=off
+```
+
+构建日志中的 `current commit information was not captured` 只是元数据提示，不会影响容器运行。
+
 ## 查看日志
 
 ```bash
