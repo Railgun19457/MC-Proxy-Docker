@@ -160,10 +160,11 @@ func (p *udpProxy) getOrCreateSession(ctx context.Context, clientAddr *net.UDPAd
 		return existing, nil
 	}
 
+	dialNet := config.BackendDialNet(p.cfg.ListenNet)
 	dialer := net.Dialer{Timeout: p.cfg.ConnectTimeout.Duration}
-	backendConn, err := dialer.DialContext(ctx, p.cfg.ListenNet, p.cfg.BackendAddr)
+	backendConn, err := dialer.DialContext(ctx, dialNet, p.cfg.BackendAddr)
 	if err != nil {
-		return nil, fmt.Errorf("dial backend failed: %w", err)
+		return nil, fmt.Errorf("dial backend failed net=%s addr=%s: %w", dialNet, p.cfg.BackendAddr, err)
 	}
 
 	udpConn, ok := backendConn.(*net.UDPConn)

@@ -105,6 +105,28 @@ func TestLoadJSONDurationFields(t *testing.T) {
 	}
 }
 
+func TestLoadAllowsBackendAddressDifferentFamily(t *testing.T) {
+	t.Parallel()
+
+	content := `proxies:
+  - name: "tcp-proxy"
+    listen_net: "tcp4"
+    listen_addr: "127.0.0.1:25565"
+    backend_addr: "[::1]:25566"
+    rule: "passthrough"
+`
+
+	path := writeTempConfig(t, ".yaml", content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got := BackendDialNet(cfg.Proxies[0].ListenNet); got != "tcp" {
+		t.Fatalf("BackendDialNet() = %q, want %q", got, "tcp")
+	}
+}
+
 func writeTempConfig(t *testing.T, ext, content string) string {
 	t.Helper()
 

@@ -6,7 +6,7 @@
 
 1. 按需编辑 `config.yaml`。
 2. 当前 `docker-compose.yml` 默认映射 `25565/tcp` 和 `19132/udp`，如果启用其他监听端口，请同步增加端口映射。
-3. 如果后端服务跑在宿主机上，建议将 `backend_addr` 改成宿主机可达地址
+3. `backend_addr` 与 `listen_net` 不要求同地址族（程序会按 tcp/udp 自动拨号）；如果后端服务跑在宿主机上，建议将 `backend_addr` 改成宿主机可达地址
 
 ## 启动服务
 

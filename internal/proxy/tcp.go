@@ -94,10 +94,11 @@ func (p *tcpProxy) acceptLoop(ctx context.Context) {
 func (p *tcpProxy) handleConn(ctx context.Context, client net.Conn) {
 	defer client.Close()
 
+	dialNet := config.BackendDialNet(p.cfg.ListenNet)
 	dialer := net.Dialer{Timeout: p.cfg.ConnectTimeout.Duration}
-	backend, err := dialer.DialContext(ctx, p.cfg.ListenNet, p.cfg.BackendAddr)
+	backend, err := dialer.DialContext(ctx, dialNet, p.cfg.BackendAddr)
 	if err != nil {
-		p.logger.Printf("proxy=%s backend connect failed: %v", p.cfg.Name, err)
+		p.logger.Printf("proxy=%s backend connect failed net=%s addr=%s err=%v", p.cfg.Name, dialNet, p.cfg.BackendAddr, err)
 		return
 	}
 	defer backend.Close()

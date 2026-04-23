@@ -169,7 +169,7 @@ func (p *ProxyConfig) normalize(index int, names map[string]struct{}) error {
 	if err := validateAddress(p.ListenNet, p.ListenAddr, "listen_addr"); err != nil {
 		return fmt.Errorf("proxy %q: %w", p.Name, err)
 	}
-	if err := validateAddress(p.ListenNet, p.BackendAddr, "backend_addr"); err != nil {
+	if err := validateAddress(BackendDialNet(p.ListenNet), p.BackendAddr, "backend_addr"); err != nil {
 		return fmt.Errorf("proxy %q: %w", p.Name, err)
 	}
 
@@ -239,15 +239,25 @@ func isSupportedNetwork(network string) bool {
 	return IsTCPNet(network) || IsUDPNet(network)
 }
 
+func BackendDialNet(listenNet string) string {
+	if IsTCPNet(listenNet) {
+		return "tcp"
+	}
+	if IsUDPNet(listenNet) {
+		return "udp"
+	}
+	return listenNet
+}
+
 func validateAddress(network, address, field string) error {
-	if IsTCPNet(network) {
+	if network == "tcp" || IsTCPNet(network) {
 		if _, err := net.ResolveTCPAddr(network, address); err != nil {
 			return fmt.Errorf("invalid %s %q: %w", field, address, err)
 		}
 		return nil
 	}
 
-	if IsUDPNet(network) {
+	if network == "udp" || IsUDPNet(network) {
 		if _, err := net.ResolveUDPAddr(network, address); err != nil {
 			return fmt.Errorf("invalid %s %q: %w", field, address, err)
 		}
