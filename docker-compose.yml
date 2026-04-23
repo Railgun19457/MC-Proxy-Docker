@@ -1,0 +1,13 @@
+services:
+  mc-proxy:
+    container_name: mc-proxy-docker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mc-proxy-docker:latest
+    restart: unless-stopped
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "25565:25565/tcp"
+      - "19132:19132/udp"
