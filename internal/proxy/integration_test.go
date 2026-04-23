@@ -157,6 +157,103 @@ func TestTCPProxyProtocolV1Integration(t *testing.T) {
 	}
 }
 
+func TestTCPProxyProtocolKeepsExistingHeader(t *testing.T) {
+	headerCh := make(chan string, 1)
+	payloadCh := make(chan []byte, 1)
+
+	backend, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("backend listen failed: %v", err)
+	}
+	defer backend.Close()
+
+	go func() {
+		conn, err := backend.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
+
+		reader := bufio.NewReader(conn)
+		header, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+		headerCh <- header
+
+		payload := make([]byte, 4)
+		if _, err := io.ReadFull(reader, payload); err != nil {
+			return
+		}
+		payloadCh <- append([]byte(nil), payload...)
+		_, _ = conn.Write(payload)
+	}()
+
+	cfg := config.ProxyConfig{
+		Name:            "tcp-proxy-keep-existing-header",
+		ListenNet:       "tcp4",
+		ListenAddr:      "127.0.0.1:0",
+		BackendAddr:     backend.Addr().String(),
+		Rule:            config.RuleProxyProtocol,
+		ProxyVersion:    1,
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		ConnectTimeout:  config.Duration{Duration: time.Second},
+	}
+
+	p := newTCPProxy(cfg, log.New(io.Discard, "", 0))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := p.Start(ctx); err != nil {
+		t.Fatalf("proxy start failed: %v", err)
+	}
+	defer p.Close()
+
+	client, err := net.Dial("tcp4", p.listener.Addr().String())
+	if err != nil {
+		t.Fatalf("client dial failed: %v", err)
+	}
+	defer client.Close()
+
+	if err := client.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set deadline failed: %v", err)
+	}
+
+	header := "PROXY TCP4 198.51.100.10 203.0.113.5 34567 25565\r\n"
+	payload := []byte("ping")
+	packet := append([]byte(header), payload...)
+	if _, err := client.Write(packet); err != nil {
+		t.Fatalf("client write failed: %v", err)
+	}
+
+	response := make([]byte, len(payload))
+	if _, err := io.ReadFull(client, response); err != nil {
+		t.Fatalf("client read failed: %v", err)
+	}
+	if !bytes.Equal(response, payload) {
+		t.Fatalf("response mismatch: got=%q want=%q", string(response), string(payload))
+	}
+
+	select {
+	case gotHeader := <-headerCh:
+		if gotHeader != header {
+			t.Fatalf("backend header mismatch: got=%q want=%q", gotHeader, header)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive header on backend")
+	}
+
+	select {
+	case gotPayload := <-payloadCh:
+		if !bytes.Equal(gotPayload, payload) {
+			t.Fatalf("backend payload mismatch: got=%q want=%q", string(gotPayload), string(payload))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive payload on backend")
+	}
+}
+
 func TestUDPIntegrationSessionReuseAndExpire(t *testing.T) {
 	backend, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {

@@ -228,11 +228,11 @@ func (p *ProxyConfig) normalize(index int, names map[string]struct{}) error {
 }
 
 func IsTCPNet(network string) bool {
-	return network == "tcp4" || network == "tcp6"
+	return network == "tcp" || network == "tcp4" || network == "tcp6"
 }
 
 func IsUDPNet(network string) bool {
-	return network == "udp4" || network == "udp6"
+	return network == "udp" || network == "udp4" || network == "udp6"
 }
 
 func isSupportedNetwork(network string) bool {

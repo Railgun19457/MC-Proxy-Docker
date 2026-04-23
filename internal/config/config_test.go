@@ -127,6 +127,36 @@ func TestLoadAllowsBackendAddressDifferentFamily(t *testing.T) {
 	}
 }
 
+func TestLoadSupportsGenericTCPUDPListenNet(t *testing.T) {
+	t.Parallel()
+
+	content := `proxies:
+  - name: "java"
+    listen_net: "tcp"
+    listen_addr: ":25565"
+    backend_addr: "127.0.0.1:25566"
+    rule: "proxy_protocol"
+  - name: "bedrock"
+    listen_net: "udp"
+    listen_addr: ":19132"
+    backend_addr: "127.0.0.1:19133"
+    rule: "passthrough"
+`
+
+	path := writeTempConfig(t, ".yaml", content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got := BackendDialNet(cfg.Proxies[0].ListenNet); got != "tcp" {
+		t.Fatalf("BackendDialNet(tcp) = %q, want %q", got, "tcp")
+	}
+	if got := BackendDialNet(cfg.Proxies[1].ListenNet); got != "udp" {
+		t.Fatalf("BackendDialNet(udp) = %q, want %q", got, "udp")
+	}
+}
+
 func writeTempConfig(t *testing.T, ext, content string) string {
 	t.Helper()
 

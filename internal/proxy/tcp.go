@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -22,6 +24,10 @@ type tcpProxy struct {
 	wg       sync.WaitGroup
 	closeMux sync.Once
 }
+
+const proxyHeaderDetectTimeout = time.Second
+
+var proxyV2Signature = []byte{0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a}
 
 func newTCPProxy(cfg config.ProxyConfig, logger *log.Logger) *tcpProxy {
 	bufferSize := cfg.ReadBufferSize
@@ -103,20 +109,83 @@ func (p *tcpProxy) handleConn(ctx context.Context, client net.Conn) {
 	}
 	defer backend.Close()
 
+	clientReader := io.Reader(client)
+
 	if p.cfg.Rule == config.RuleProxyProtocol {
-		if err := protocol.WriteHeader(backend, client.RemoteAddr(), client.LocalAddr(), p.cfg.ProxyVersion, false); err != nil {
-			p.logger.Printf("proxy=%s write PROXY header failed: %v", p.cfg.Name, err)
+		hasHeader, bufferedReader, err := p.detectProxyHeader(client)
+		if err != nil {
+			p.logger.Printf("proxy=%s detect PROXY header failed: %v", p.cfg.Name, err)
 			return
+		}
+		clientReader = bufferedReader
+
+		if !hasHeader {
+			if err := protocol.WriteHeader(backend, client.RemoteAddr(), client.LocalAddr(), p.cfg.ProxyVersion, false); err != nil {
+				p.logger.Printf("proxy=%s write PROXY header failed: %v", p.cfg.Name, err)
+				return
+			}
 		}
 	}
 
-	p.copyBidirectional(client, backend)
+	p.copyBidirectional(clientReader, client, backend)
 }
 
-func (p *tcpProxy) copyBidirectional(client, backend net.Conn) {
+func (p *tcpProxy) detectProxyHeader(client net.Conn) (bool, *bufio.Reader, error) {
+	reader := bufio.NewReader(client)
+
+	if err := client.SetReadDeadline(time.Now().Add(proxyHeaderDetectTimeout)); err != nil {
+		return false, nil, fmt.Errorf("set detect deadline failed: %w", err)
+	}
+
+	hasHeader, err := detectProxyHeaderPrefix(reader)
+	if resetErr := client.SetReadDeadline(time.Time{}); resetErr != nil {
+		return false, nil, fmt.Errorf("clear detect deadline failed: %w", resetErr)
+	}
+
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return false, reader, nil
+		}
+
+		var nerr net.Error
+		if errors.As(err, &nerr) && nerr.Timeout() {
+			return false, reader, nil
+		}
+
+		return false, nil, err
+	}
+
+	return hasHeader, reader, nil
+}
+
+func detectProxyHeaderPrefix(reader *bufio.Reader) (bool, error) {
+	first, err := reader.Peek(1)
+	if err != nil {
+		return false, err
+	}
+
+	switch first[0] {
+	case 'P':
+		prefix, err := reader.Peek(5)
+		if err != nil {
+			return false, err
+		}
+		return bytes.Equal(prefix, []byte("PROXY")), nil
+	case proxyV2Signature[0]:
+		sig, err := reader.Peek(len(proxyV2Signature))
+		if err != nil {
+			return false, err
+		}
+		return bytes.Equal(sig, proxyV2Signature), nil
+	default:
+		return false, nil
+	}
+}
+
+func (p *tcpProxy) copyBidirectional(clientReader io.Reader, client, backend net.Conn) {
 	done := make(chan struct{}, 2)
 
-	go p.pipe(backend, client, done)
+	go p.pipe(backend, clientReader, done)
 	go p.pipe(client, backend, done)
 
 	<-done
@@ -125,7 +194,7 @@ func (p *tcpProxy) copyBidirectional(client, backend net.Conn) {
 	<-done
 }
 
-func (p *tcpProxy) pipe(dst, src net.Conn, done chan<- struct{}) {
+func (p *tcpProxy) pipe(dst net.Conn, src io.Reader, done chan<- struct{}) {
 	buf := p.pool.Get().([]byte)
 	defer p.pool.Put(buf)
 	defer func() { done <- struct{}{} }()

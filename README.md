@@ -5,8 +5,20 @@
 ## 准备配置
 
 1. 按需编辑 `config.yaml`。
-2. 当前 `docker-compose.yml` 默认映射 `25565/tcp` 和 `19132/udp`，如果启用其他监听端口，请同步增加端口映射。
-3. `backend_addr` 与 `listen_net` 不要求同地址族（程序会按 tcp/udp 自动拨号）；如果后端服务跑在宿主机上，建议将 `backend_addr` 改成宿主机可达地址
+2. `listen_net` 支持 `tcp`、`udp`、`tcp4`、`tcp6`、`udp4`、`udp6`；建议优先使用 `tcp/udp`，避免 v4/v6 规则分叉。
+3. 当前 `docker-compose.yml` 默认映射 `25565/tcp` 和 `19132/udp`，如果启用其他监听端口，请同步增加端口映射。
+4. `backend_addr` 与 `listen_net` 不要求同地址族（程序会按 tcp/udp 自动拨号）；如果后端服务跑在宿主机上，建议将 `backend_addr` 改成宿主机可达地址。
+
+## PROXY protocol 自动补头
+
+当入口配置 `rule: "proxy_protocol"` 时：
+
+1. 如果前置链路（如 FRP）已经带了 PROXY 头，MC-Proxy 会直接透传，不重复添加。
+2. 如果前置链路没有 PROXY 头，MC-Proxy 会按 `proxy_version` 自动补写后再转发到后端。
+
+这可以同时兼容“直连无头”与“前置已注入头”的流量来源。
+
+
 
 ## 启动服务
 
