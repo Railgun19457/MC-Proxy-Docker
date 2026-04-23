@@ -3,7 +3,7 @@
 ## 1. 项目概述
 - 项目名称：MC-Proxy
 - 开发语言：Go 1.21+
-- 项目定位：Minecraft 流量代理，处理 TCP/UDP 转发，并在需要时补充 PROXY Protocol 头，以解决 FRP 穿透、IPv6 直连和后端真实 IP 透传问题。
+- 项目定位：Minecraft 流量代理，处理 TCP/UDP 转发，并在需要时补充 PROXY Protocol 头，以解决 FRP 穿透和后端真实 IP 透传问题。
 - 交付形式：单一可执行文件 + Docker 镜像，优先选择 scratch，必要时可切换 alpine。
 
 ## 2. 目标与边界
@@ -20,7 +20,7 @@
 - 不承诺跨平台零差异零拷贝表现，零拷贝仅作为 Linux 上的性能优化路径。
 
 ## 3. 典型场景
-- IPv6 直连玩家进入代理后，由代理补全 PROXY Protocol 头再转发给后端。
+- 玩家进入代理后，由代理补全 PROXY Protocol 头再转发给后端。
 - FRP 反向代理已经携带真实来源信息时，代理仅做透明转发。
 - 基岩版 UDP 流量通过代理保持会话映射并维持源地址语义。
 
@@ -65,16 +65,16 @@
 ### 6.2 YAML 示例
 ```yaml
 proxies:
-  # 场景1：IPv6 直连玩家补全 PROXY Protocol 头
-  - name: "mc-ipv6-direct"
+  # 场景1：玩家直连补全 PROXY Protocol 头
+  - name: "mc-direct"
     listen_net: "tcp"
     listen_addr: "[::]:25565"
     backend_addr: "127.0.0.1:25566"
     rule: "proxy_protocol"
     proxy_version: 2
 
-  # 场景2：FRP 进来的 IPv4 流量直接透明转发
-  - name: "mc-ipv4-frp"
+  # 场景2：FRP 进来的流量直接透明转发
+  - name: "mc-frp"
     listen_net: "tcp"
     listen_addr: "0.0.0.0:25565"
     backend_addr: "127.0.0.1:25566"

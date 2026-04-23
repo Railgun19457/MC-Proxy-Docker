@@ -157,6 +157,27 @@ func TestLoadSupportsGenericTCPUDPListenNet(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsLegacyListenNet(t *testing.T) {
+	t.Parallel()
+
+	content := `proxies:
+  - name: "legacy-tcp4"
+    listen_net: "tcp4"
+    listen_addr: "127.0.0.1:25565"
+    backend_addr: "127.0.0.1:25566"
+    rule: "passthrough"
+`
+
+	path := writeTempConfig(t, ".yaml", content)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("Load() expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "unsupported listen_net") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func writeTempConfig(t *testing.T, ext, content string) string {
 	t.Helper()
 

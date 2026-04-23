@@ -9,7 +9,7 @@ MC-Proxy 是一个面向 Minecraft 的轻量代理，支持：
 
 ## 配置原则
 
-1. 推荐只使用 `tcp` 或 `udp`，不要再拆分 v4/v6 双规则。
+1. `listen_net` 仅支持 `tcp` 或 `udp`。
 2. 同一服务端口只保留一条规则，避免行为分叉。
 3. `backend_addr` 可以写主机名，程序会按协议自动拨号。
 4. 推荐从 `example-config.yaml` 复制为 `config.yaml` 后再按需修改。
@@ -36,7 +36,7 @@ MC-Proxy 是一个面向 Minecraft 的轻量代理，支持：
 1. 如果入站流量已经带 PROXY 头，MC-Proxy 直接透传，不会重复注入。
 2. 如果入站流量没有 PROXY 头，MC-Proxy 会根据 `proxy_version` 自动补写。
 
-这意味着同一入口可以同时兼容：
+这意味着同一入口可以同时处理：
 
 1. 直连客户端（无头）
 2. 经过 FRP/NLB 等前置链路（可能已注入头）
