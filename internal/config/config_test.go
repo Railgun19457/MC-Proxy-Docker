@@ -13,7 +13,7 @@ func TestLoadYAMLDefaults(t *testing.T) {
 
 	content := `proxies:
   - name: "tcp-proxy"
-    listen_net: "tcp4"
+    listen_net: "tcp"
     listen_addr: "127.0.0.1:25565"
     backend_addr: "127.0.0.1:25566"
     rule: "proxy_protocol"
@@ -48,7 +48,7 @@ func TestLoadRejectsUDPProxyProtocolV1(t *testing.T) {
 
 	content := `proxies:
   - name: "udp-proxy"
-    listen_net: "udp4"
+    listen_net: "udp"
     listen_addr: "127.0.0.1:19132"
     backend_addr: "127.0.0.1:19133"
     rule: "proxy_protocol"
@@ -72,7 +72,7 @@ func TestLoadJSONDurationFields(t *testing.T) {
   "proxies": [
     {
       "name": "udp-proxy",
-      "listen_net": "udp4",
+      "listen_net": "udp",
       "listen_addr": "127.0.0.1:19132",
       "backend_addr": "127.0.0.1:19133",
       "rule": "passthrough",
@@ -110,7 +110,7 @@ func TestLoadAllowsBackendAddressDifferentFamily(t *testing.T) {
 
 	content := `proxies:
   - name: "tcp-proxy"
-    listen_net: "tcp4"
+    listen_net: "tcp"
     listen_addr: "127.0.0.1:25565"
     backend_addr: "[::1]:25566"
     rule: "passthrough"

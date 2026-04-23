@@ -166,20 +166,45 @@ func detectProxyHeaderPrefix(reader *bufio.Reader) (bool, error) {
 
 	switch first[0] {
 	case 'P':
-		prefix, err := reader.Peek(5)
-		if err != nil {
-			return false, err
-		}
-		return bytes.Equal(prefix, []byte("PROXY")), nil
+		return detectProxySignature(reader, []byte("PROXY"))
 	case proxyV2Signature[0]:
-		sig, err := reader.Peek(len(proxyV2Signature))
-		if err != nil {
-			return false, err
-		}
-		return bytes.Equal(sig, proxyV2Signature), nil
+		return detectProxySignature(reader, proxyV2Signature)
 	default:
 		return false, nil
 	}
+}
+
+func detectProxySignature(reader *bufio.Reader, signature []byte) (bool, error) {
+	buf, err := reader.Peek(len(signature))
+	if err == nil {
+		return bytes.Equal(buf, signature), nil
+	}
+
+	if !errors.Is(err, io.EOF) {
+		var nerr net.Error
+		if !errors.As(err, &nerr) || !nerr.Timeout() {
+			return false, err
+		}
+	}
+
+	buffered := reader.Buffered()
+	if buffered == 0 {
+		return false, nil
+	}
+	if buffered > len(signature) {
+		buffered = len(signature)
+	}
+
+	partial, peekErr := reader.Peek(buffered)
+	if peekErr != nil {
+		return false, err
+	}
+
+	if bytes.HasPrefix(signature, partial) {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (p *tcpProxy) copyBidirectional(clientReader io.Reader, client, backend net.Conn) {

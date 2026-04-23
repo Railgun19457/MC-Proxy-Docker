@@ -12,7 +12,7 @@ import (
 )
 
 func TestUDPSessionCreateRefreshExpire(t *testing.T) {
-	backend, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	backend, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatalf("ListenUDP() error = %v", err)
 	}
@@ -20,7 +20,7 @@ func TestUDPSessionCreateRefreshExpire(t *testing.T) {
 
 	cfg := config.ProxyConfig{
 		Name:              "udp-session-test",
-		ListenNet:         "udp4",
+		ListenNet:         "udp",
 		ListenAddr:        "127.0.0.1:0",
 		BackendAddr:       backend.LocalAddr().String(),
 		Rule:              config.RulePassthrough,

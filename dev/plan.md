@@ -35,7 +35,7 @@
 ## 5. 架构设计
 ### 5.1 核心模块
 - Config Manager：解析 YAML 或 JSON 配置，负责配置校验和默认值补全。
-- Listener Manager：按配置启动 tcp4、tcp6、udp4、udp6 监听器。
+- Listener Manager：按配置启动 tcp、udp 监听器。
 - TCP Proxy Core：建立后端连接后执行规则分流，负责 header 注入与数据转发。
 - UDP Proxy Core：维护客户端会话和后端映射，处理包转发与超时回收。
 - Protocol Encoder：构建 PROXY Protocol V1/V2 报文头。
@@ -53,7 +53,7 @@
 ### 6.1 配置结构
 - proxies：代理实例数组。
 - name：实例名称，用于日志和排障。
-- listen_net：tcp4、tcp6、udp4、udp6。
+- listen_net：tcp、udp。
 - listen_addr：监听地址。
 - backend_addr：后端地址。
 - rule：passthrough 或 proxy_protocol。
@@ -67,7 +67,7 @@
 proxies:
   # 场景1：IPv6 直连玩家补全 PROXY Protocol 头
   - name: "mc-ipv6-direct"
-    listen_net: "tcp6"
+    listen_net: "tcp"
     listen_addr: "[::]:25565"
     backend_addr: "127.0.0.1:25566"
     rule: "proxy_protocol"
@@ -75,14 +75,14 @@ proxies:
 
   # 场景2：FRP 进来的 IPv4 流量直接透明转发
   - name: "mc-ipv4-frp"
-    listen_net: "tcp4"
+    listen_net: "tcp"
     listen_addr: "0.0.0.0:25565"
     backend_addr: "127.0.0.1:25566"
     rule: "passthrough"
 
   # 场景3：基岩版 UDP 透明转发
   - name: "bedrock-udp"
-    listen_net: "udp4"
+    listen_net: "udp"
     listen_addr: "0.0.0.0:19132"
     backend_addr: "127.0.0.1:19133"
     rule: "passthrough"

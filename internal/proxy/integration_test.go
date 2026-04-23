@@ -15,7 +15,7 @@ import (
 )
 
 func TestTCPPassthroughIntegration(t *testing.T) {
-	backend, err := net.Listen("tcp4", "127.0.0.1:0")
+	backend, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("backend listen failed: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestTCPPassthroughIntegration(t *testing.T) {
 
 	cfg := config.ProxyConfig{
 		Name:            "tcp-pass",
-		ListenNet:       "tcp4",
+		ListenNet:       "tcp",
 		ListenAddr:      "127.0.0.1:0",
 		BackendAddr:     backend.Addr().String(),
 		Rule:            config.RulePassthrough,
@@ -49,7 +49,7 @@ func TestTCPPassthroughIntegration(t *testing.T) {
 	}
 	defer p.Close()
 
-	client, err := net.Dial("tcp4", p.listener.Addr().String())
+	client, err := net.Dial("tcp", p.listener.Addr().String())
 	if err != nil {
 		t.Fatalf("client dial failed: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestTCPPassthroughIntegration(t *testing.T) {
 func TestTCPProxyProtocolV1Integration(t *testing.T) {
 	headerCh := make(chan string, 1)
 
-	backend, err := net.Listen("tcp4", "127.0.0.1:0")
+	backend, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("backend listen failed: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestTCPProxyProtocolV1Integration(t *testing.T) {
 
 	cfg := config.ProxyConfig{
 		Name:            "tcp-proxy-v1",
-		ListenNet:       "tcp4",
+		ListenNet:       "tcp",
 		ListenAddr:      "127.0.0.1:0",
 		BackendAddr:     backend.Addr().String(),
 		Rule:            config.RuleProxyProtocol,
@@ -124,7 +124,7 @@ func TestTCPProxyProtocolV1Integration(t *testing.T) {
 	}
 	defer p.Close()
 
-	client, err := net.Dial("tcp4", p.listener.Addr().String())
+	client, err := net.Dial("tcp", p.listener.Addr().String())
 	if err != nil {
 		t.Fatalf("client dial failed: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestTCPProxyProtocolKeepsExistingHeader(t *testing.T) {
 	headerCh := make(chan string, 1)
 	payloadCh := make(chan []byte, 1)
 
-	backend, err := net.Listen("tcp4", "127.0.0.1:0")
+	backend, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("backend listen failed: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestTCPProxyProtocolKeepsExistingHeader(t *testing.T) {
 
 	cfg := config.ProxyConfig{
 		Name:            "tcp-proxy-keep-existing-header",
-		ListenNet:       "tcp4",
+		ListenNet:       "tcp",
 		ListenAddr:      "127.0.0.1:0",
 		BackendAddr:     backend.Addr().String(),
 		Rule:            config.RuleProxyProtocol,
@@ -210,7 +210,7 @@ func TestTCPProxyProtocolKeepsExistingHeader(t *testing.T) {
 	}
 	defer p.Close()
 
-	client, err := net.Dial("tcp4", p.listener.Addr().String())
+	client, err := net.Dial("tcp", p.listener.Addr().String())
 	if err != nil {
 		t.Fatalf("client dial failed: %v", err)
 	}
@@ -254,8 +254,50 @@ func TestTCPProxyProtocolKeepsExistingHeader(t *testing.T) {
 	}
 }
 
+func TestDetectProxyHeaderFragmentedPrefix(t *testing.T) {
+	t.Parallel()
+
+	clientSide, upstreamSide := net.Pipe()
+	defer clientSide.Close()
+	defer upstreamSide.Close()
+
+	header := "PROXY TCP4 198.51.100.10 203.0.113.5 34567 25565\r\n"
+	payload := "ping"
+
+	go func() {
+		_, _ = upstreamSide.Write([]byte("PRO"))
+		time.Sleep(proxyHeaderDetectTimeout + 150*time.Millisecond)
+		_, _ = upstreamSide.Write([]byte("XY TCP4 198.51.100.10 203.0.113.5 34567 25565\r\n" + payload))
+	}()
+
+	p := newTCPProxy(config.ProxyConfig{ReadBufferSize: 1024, WriteBufferSize: 1024}, log.New(io.Discard, "", 0))
+	hasHeader, reader, err := p.detectProxyHeader(clientSide)
+	if err != nil {
+		t.Fatalf("detectProxyHeader() error = %v", err)
+	}
+	if !hasHeader {
+		t.Fatal("detectProxyHeader() should detect fragmented PROXY header")
+	}
+
+	gotHeader, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("ReadString() error = %v", err)
+	}
+	if gotHeader != header {
+		t.Fatalf("header mismatch: got=%q want=%q", gotHeader, header)
+	}
+
+	buf := make([]byte, len(payload))
+	if _, err := io.ReadFull(reader, buf); err != nil {
+		t.Fatalf("ReadFull() error = %v", err)
+	}
+	if string(buf) != payload {
+		t.Fatalf("payload mismatch: got=%q want=%q", string(buf), payload)
+	}
+}
+
 func TestUDPIntegrationSessionReuseAndExpire(t *testing.T) {
-	backend, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	backend, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatalf("backend listen failed: %v", err)
 	}
@@ -285,7 +327,7 @@ func TestUDPIntegrationSessionReuseAndExpire(t *testing.T) {
 
 	cfg := config.ProxyConfig{
 		Name:              "udp-pass",
-		ListenNet:         "udp4",
+		ListenNet:         "udp",
 		ListenAddr:        "127.0.0.1:0",
 		BackendAddr:       backend.LocalAddr().String(),
 		Rule:              config.RulePassthrough,
@@ -304,7 +346,7 @@ func TestUDPIntegrationSessionReuseAndExpire(t *testing.T) {
 	defer p.Close()
 
 	proxyAddr := p.listener.LocalAddr().(*net.UDPAddr)
-	client, err := net.DialUDP("udp4", nil, proxyAddr)
+	client, err := net.DialUDP("udp", nil, proxyAddr)
 	if err != nil {
 		t.Fatalf("client dial failed: %v", err)
 	}
